@@ -63,3 +63,29 @@ With desock, `write` is redirected to stdout and `read` is redirected to stdin. 
 
 - **If send_thread wins the race**: Desock's `write` function will echo what you typed back to stdout (terminal)
 - **If recv_thread wins the race**: The `read` function will read from stdin and `printf` it to the terminal with the "Server: " prefix
+
+## Fuzzer (simple-fuzzer.c)
+
+This repository includes a small driver `simple-fuzzer.c` that injects inputs into the client process by wiring a pipe to the child's stdin and setting `LD_PRELOAD=./desock/desock.so`.
+
+- Behavior:
+	- Parent (fuzzer) writes payloads into the pipe. Each payload contains an increasing counter so you can track inputs.
+	- Child execs `./bin/client` with its stdin redirected from the pipe and `LD_PRELOAD` set to the desock library.
+	- Because desock redirects socket read/write to stdin/stdout, the client will process the injected payloads as if they came from a server.
+
+- Signals and shutdown:
+	- `simple-fuzzer.c` installs a SIGINT handler in the parent so pressing Ctrl+C will stop sending, close the pipe (causing EOF on the child's stdin), and wait for the client to exit. This ensures a clean shutdown and a clear end-of-input.
+
+- Build & run:
+```bash
+# build client/server/simple-fuzzer
+make
+
+# build desock (library)
+cd desock && make && cd ..
+
+# run the fuzzer (it will spawn the client with LD_PRELOAD)
+./simple-fuzzer
+```
+
+You can stop the fuzzer with Ctrl+C; the child will receive EOF on stdin.
