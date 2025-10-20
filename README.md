@@ -40,12 +40,12 @@ Run normally:
 
 Run client with desock:
 ```bash
-LD_PRELOAD=./desock/desock.so ./bin/client 127.0.0.1 5555
+LD_PRELOAD=./desock/desock.so ./bin/client 5555
 ```
 
 Run client with desockplus:
 ```bash
-LD_PRELOAD=./desockplus/desockplus.so ./bin/client 127.0.0.1 5555
+LD_PRELOAD=./desockplus/desockplus.so ./bin/client 5555
 ```
 
 ## How Desock Works
