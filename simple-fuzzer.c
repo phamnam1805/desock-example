@@ -3,13 +3,39 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <signal.h>
+
+int pipefd[2];
+// pipefd[0] read pipe end
+// pipefd[1] write pipe end
+pid_t pid;
+
+static void handle_parent_sigint(int sig)
+{
+    (void)sig;
+    if (pipefd[1] != -1 || pipefd[0] != -1)
+    {
+        close(pipefd[0]);
+        close(pipefd[1]);
+    }
+    printf("[Fuzzer] Sent all payloads. Closing pipe (sending EOF).\n");
+    int status;
+    waitpid(pid, &status, 0);
+
+    if (WIFSIGNALED(status))
+    {
+        printf("[Fuzzer] Client crashed with signal: %d\n", WTERMSIG(status));
+    }
+    else
+    {
+        printf("[Fuzzer] Client exited normally.\n");
+    }
+    fprintf(stderr, "Exiting.\n");
+    exit(0);
+}
 
 int main()
 {
-    int pipefd[2];
-    // pipefd[0] read pipe end
-    // pipefd[1] write pipe end
-    pid_t pid;
     if (pipe(pipefd) < 0)
     {
         perror("pipe");
@@ -24,7 +50,8 @@ int main()
     }
 
     if (pid == 0)
-    {
+    {   
+        signal(SIGINT, SIG_IGN); // Ignore SIGINT in child process
         close(pipefd[1]);
         // child process only reads from pipe
 
@@ -57,6 +84,8 @@ int main()
     }
     else
     {
+        signal(SIGINT, handle_parent_sigint);
+        
         close(pipefd[0]);
         // parent process only writes to pipe
         sleep(1);
@@ -70,23 +99,6 @@ int main()
             printf("[Fuzzer] Sent: %s", payload);
             write(pipefd[1], payload, strlen(payload));
             sleep(1);
-        }
-
-        // ------------------------------------
-
-        printf("[Fuzzer] Sent all payloads. Closing pipe (sending EOF).\n");
-        close(pipefd[1]); // Close write end to send EOF to read end - child would receive EOF on stdin
-
-        int status;
-        waitpid(pid, &status, 0);
-
-        if (WIFSIGNALED(status))
-        {
-            printf("[Fuzzer] Client crashed with signal: %d\n", WTERMSIG(status));
-        }
-        else
-        {
-            printf("[Fuzzer] Client exited normally.\n");
         }
     }
 }
