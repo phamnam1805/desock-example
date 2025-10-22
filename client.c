@@ -8,20 +8,35 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 
 #define BUF_SIZE 1024
+
+pthread_t tid_recv, tid_send;
+int sock_fd;
+
+static void handle_sigint(int sig)
+{
+    (void)sig;
+    if (sock_fd != -1) close(sock_fd);
+
+    pthread_cancel(tid_recv);
+    pthread_cancel(tid_send);
+    fprintf(stderr, "Exiting.\n");
+}
 
 void *recv_thread(void *arg)
 {
     int fd = *(int *)arg;
     char buf[BUF_SIZE];
-    for (;;)
+    while(1)
     {
-        int n = read(fd, buf, BUF_SIZE - 1);
+        int n = recv(fd, buf, BUF_SIZE - 1, 0);
         if (n <= 0)
         {
             printf("Server disconnected.\n");
-            exit(0);
+            handle_sigint(0);
+            break;
         }
         buf[n] = '\0';
         printf("Server: %s", buf);
@@ -33,11 +48,26 @@ void *send_thread(void *arg)
 {
     int fd = *(int *)arg;
     char buf[BUF_SIZE];
-    for (;;)
+    while(1)
     {
         if (!fgets(buf, BUF_SIZE, stdin))
-            break;
-        write(fd, buf, strlen(buf));
+            perror("fgets");
+        if (strncmp(buf, "oob ", 4) == 0)
+        {
+            char *msg = buf + 4;
+            size_t len = strlen(msg);
+            if (len > 0 && msg[len - 1] == '\n')
+                msg[len - 1] = '\0';
+            if (send(fd, msg, strlen(msg), MSG_OOB) < 0)
+                perror("send(MSG_OOB)");
+            else
+                printf(">>> Sent OOB message: %s\n", msg);
+        }
+        else
+        {
+            if (send(fd, buf, strlen(buf), 0) < 0)
+                perror("send");
+        }
     }
     return NULL;
 }
@@ -57,7 +87,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd < 0)
     {
         perror("socket");
@@ -78,15 +108,14 @@ int main(int argc, char **argv)
     }
 
     printf("Connected to 127.0.0.1:%d\n", port);
-
-    pthread_t tid_recv, tid_send;
     
     pthread_create(&tid_recv, NULL, recv_thread, &sock_fd);
     pthread_create(&tid_send, NULL, send_thread, &sock_fd);
 
+    signal(SIGINT, handle_sigint);
+
     pthread_join(tid_recv, NULL);
     pthread_join(tid_send, NULL);
 
-    close(sock_fd);
     return 0;
 }

@@ -85,7 +85,7 @@ make
 cd desock && make && cd ..
 
 # run the fuzzer (it will spawn the client with LD_PRELOAD)
-./simple-fuzzer
+./bin/simple-fuzzer
 ```
 
 You can stop the fuzzer with Ctrl+C; the child will receive EOF on stdin.
