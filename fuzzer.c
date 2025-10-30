@@ -116,7 +116,7 @@ int main()
         }
         close(output_pipe[1]);
 
-        const char *preload = "./desock/desock.so";
+        const char *preload = "./desockplus/desockplus.so";
         if (setenv("LD_PRELOAD", preload, 1) != 0)
         {
             perror("setenv");
@@ -124,7 +124,7 @@ int main()
         }
 
         char *args[] = {
-            "./bin/client",
+            "./bin/server",
             "5555",
             NULL};
 

@@ -65,7 +65,7 @@ int main()
         close(pipefd[0]);
         // No longer needed
 
-        const char *preload = "./desock/desock.so";
+        const char *preload = "./desockplus/desockplus.so";
         if (setenv("LD_PRELOAD", preload, 1) != 0)
         {
             perror("setenv");
